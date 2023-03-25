@@ -95,14 +95,18 @@ export class CancelablePromise<TResult>
       },
       {
         cancel: (reason) => {
-          this.cancel(reason);
-
-          return this;
+          return this.cancel(reason);
         },
         onCancel: (callback) => {
           this.subscribeToOwnCancelEvent(callback);
 
           return this;
+        },
+        onProgress: (callback) => {
+          return this.onProgress(callback);
+        },
+        reportProgress: (progressPercentage) => {
+          this.reportProgress(progressPercentage);
         },
       }
     );
@@ -156,7 +160,7 @@ export class CancelablePromise<TResult>
   };
 
   /**
-   * This method allows to report the progress of the message from the main thread in the onProgress callback
+   * This method allows to report the progress across the chain of promises.
    * */
   public onProgress = (callback: TOnProgressCallback) => {
     this.onProgressCallbacks.push(callback);

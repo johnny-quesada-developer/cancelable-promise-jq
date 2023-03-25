@@ -10,6 +10,8 @@ export type TCancelCallback = (reason?: unknown) => void;
 export type TCancelablePromiseUtils<TResult = unknown> = {
   cancel: (reason?: unknown) => TCancelablePromise<TResult>;
   onCancel: (callback: TCancelCallback) => TCancelablePromise<TResult>;
+  onProgress: (callback: TOnProgressCallback) => TCancelablePromise<TResult>;
+  reportProgress: (progressPercentage: number) => void;
 };
 
 export type TCancelablePromiseCallback<TResult = unknown> = (
@@ -38,6 +40,8 @@ export interface TCancelablePromise<TResult = unknown>
   status: TPromiseStatus;
   onCancel: TCancelablePromiseUtils<TResult>['onCancel'];
   cancel: TCancelablePromiseUtils<TResult>['cancel'];
+  onProgress: TCancelablePromiseUtils<TResult>['onProgress'];
+  reportProgress: TCancelablePromiseUtils<TResult>['reportProgress'];
   data: TCancelablePromiseData;
 }
 
