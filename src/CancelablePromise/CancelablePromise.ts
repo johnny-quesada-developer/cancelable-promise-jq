@@ -1,21 +1,61 @@
-import {
-  TPromiseStatus,
-  TResolveCallback,
-  TRejectCallback,
-  TCancelablePromise,
-  TCancelCallback,
-  TCancelablePromiseCallback,
-  TCancelablePromiseData,
-  TOnProgressCallback,
-} from './CancelablePromise.types';
+export type TPromiseStatus = 'canceled' | 'pending' | 'resolved' | 'rejected';
+
+export type TResolveCallback<TResult> = (
+  value?: TResult | PromiseLike<TResult>
+) => void;
+
+export type TRejectCallback = (reason?: unknown) => void;
+export type TCancelCallback = (reason?: unknown) => void;
+
+export type CancelablePromiseUtils<TResult = unknown> = {
+  cancel: (reason?: unknown) => CancelablePromise<TResult>;
+  onCancel: (callback: TCancelCallback) => CancelablePromise<TResult>;
+  onProgress: (callback: TOnProgressCallback) => CancelablePromise<TResult>;
+  reportProgress: (progressPercentage: number) => void;
+};
+
+export type CancelablePromiseCallback<TResult = unknown> = (
+  resolve: TResolveCallback<TResult>,
+  reject: TRejectCallback,
+  utils: CancelablePromiseUtils<TResult>
+) => void;
+
+/**
+ * Callback for the reportProgress event of the promise.
+ */
+export type TOnProgressCallback = (progressPercentage: number) => void;
+
+export type TCancelablePromiseBuildCallback<T = unknown> = () =>
+  | Promise<T>
+  | CancelablePromise<T>;
+
+export type CancelablePromiseData = Record<string, unknown> & {
+  group?: {
+    promises: CancelablePromise[];
+  };
+};
+
+export type TDecoupledCancelablePromise<TResult = unknown> = {
+  promise: CancelablePromise<TResult>;
+  resolve: TResolveCallback<TResult>;
+  reject: TRejectCallback;
+} & CancelablePromiseUtils<TResult>;
+
+export type TCancelablePromiseGroupConfig = {
+  maxConcurrent?: number;
+  executeInOrder?: boolean;
+  beforeEachCallback?: () => void;
+  afterEachCallback?: (result: unknown) => void;
+  onQueueEmptyCallback?: (result: unknown[] | null) => void;
+};
 
 /**
  * CancelablePromise is a Promise that can be canceled.
  * It is a Promise that has a status property that can be 'pending', 'resolved', 'rejected' or 'canceled'.
  * It has an onCancel method that allows to register a callback that will be called when the promise is canceled.
  * It has a cancel method that allows to cancel the promise.
- * @param {TCancelablePromiseCallback<TResult>} [callback] the callback of the promise, it will receive the resolve, reject and cancel functions
- * @param {TCancelablePromiseData<TMetadata>} [data] the data of the promise
+ * @param {CancelablePromiseCallback<TResult>} [callback] the callback of the promise, it will receive the resolve, reject and cancel functions
+ * @param {CancelablePromiseData<TMetadata>} [data] the data of the promise
  * @constructor
  * @example
  * const promise = new CancelablePromise((resolve, reject, utils) => {
@@ -36,10 +76,7 @@ import {
  * console.log(promise.status); // 'canceled'
  * });
  */
-export class CancelablePromise<TResult>
-  extends Promise<TResult>
-  implements TCancelablePromise<TResult>
-{
+export class CancelablePromise<TResult = void> extends Promise<TResult> {
   /**
    * The status of the promise.
    */
@@ -48,7 +85,7 @@ export class CancelablePromise<TResult>
   /**
    * extra data of the promise util for debugging
    */
-  public data: TCancelablePromiseData = {};
+  public data: CancelablePromiseData = {};
 
   private cancelCallbacks: TCancelCallback[] = [];
   private ownCancelCallbacks: TCancelCallback[] = [];
@@ -70,7 +107,7 @@ export class CancelablePromise<TResult>
    * */
   private reject: TRejectCallback;
 
-  constructor(callback: TCancelablePromiseCallback<TResult>) {
+  constructor(callback: CancelablePromiseCallback<TResult>) {
     let resolve: TResolveCallback<TResult>;
     let reject: TRejectCallback;
 
@@ -151,9 +188,7 @@ export class CancelablePromise<TResult>
    * @param {TCancellablePromiseCallback} [callback] the callback to be called when the promise is canceled
    * @returns {CancelablePromise} the promise itself
    * */
-  public onCancel = (
-    callback: TCancelCallback
-  ): TCancelablePromise<TResult> => {
+  public onCancel = (callback: TCancelCallback): CancelablePromise<TResult> => {
     this.cancelCallbacks.push(callback);
 
     return this;

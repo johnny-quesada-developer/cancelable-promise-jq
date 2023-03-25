@@ -1,4 +1,4 @@
-import { TCancelablePromise } from '../../CancelablePromise';
+import { CancelablePromise } from '../../CancelablePromise';
 
 export type TExceptionHandlingType = 'error' | 'warn' | 'ignore';
 
@@ -22,6 +22,6 @@ export type TTryCatchPromiseResult<
   TError = unknown
 > = Promise<
   TTryCatchResult<TResult, TError> & {
-    promise: TCancelablePromise<TResult>;
+    promise: CancelablePromise<TResult>;
   }
 >;

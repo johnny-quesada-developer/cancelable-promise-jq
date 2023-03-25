@@ -1,13 +1,12 @@
-import { CancelablePromise } from './CancelablePromise';
 import {
+  CancelablePromise,
+  CancelablePromiseUtils,
   TDecoupledCancelablePromise,
-  TResolveCallback,
   TRejectCallback,
-  TCancelablePromise,
-  TCancelablePromiseUtils,
-  TCancelablePromiseBuildCallback,
+  TResolveCallback,
   TCancelablePromiseGroupConfig,
-} from './CancelablePromise.types';
+  TCancelablePromiseBuildCallback,
+} from './CancelablePromise';
 
 /**
  * Create a decoupled promise.
@@ -33,7 +32,7 @@ export const createDecoupledPromise = <
 >(): TDecoupledCancelablePromise<TResult> => {
   let resolve: TResolveCallback<TResult>;
   let reject: TRejectCallback;
-  let utils: TCancelablePromiseUtils<TResult>;
+  let utils: CancelablePromiseUtils<TResult>;
 
   const promise = new CancelablePromise<TResult>(
     (_resolve, _reject, _utils) => {
@@ -66,11 +65,11 @@ export const createDecoupledPromise = <
 export const toCancelablePromise = <
   T = unknown,
   TResult = T extends Promise<unknown>
-    ? TCancelablePromise<Awaited<T>>
-    : TCancelablePromise<T>
+    ? CancelablePromise<Awaited<T>>
+    : CancelablePromise<T>
 >(
   source: T
-): TCancelablePromise<TResult> => {
+): CancelablePromise<TResult> => {
   if (source instanceof CancelablePromise) return source;
   if (typeof source === 'function') return toCancelablePromise(source());
 
@@ -137,11 +136,11 @@ export const toCancelablePromise = <
 export const groupAsCancelablePromise = <TResult extends Array<unknown>>(
   sources: (
     | TCancelablePromiseBuildCallback
-    | TCancelablePromise
+    | CancelablePromise<TResult>
     | Promise<unknown>
   )[],
   config: TCancelablePromiseGroupConfig = {}
-): TCancelablePromise<TResult> | null => {
+): CancelablePromise<TResult> | null => {
   if (!sources.length) return null;
 
   const {

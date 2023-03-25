@@ -1,5 +1,4 @@
 import {
-  TCancelablePromise,
   CancelablePromise,
   toCancelablePromise,
 } from '../../CancelablePromise';
@@ -104,10 +103,10 @@ export const tryCatch = <
 export const tryCatchPromise = async <
   TError,
   TSource extends
-    | (() => TCancelablePromise<unknown> | Promise<unknown> | unknown)
-    | TCancelablePromise,
+    | (() => CancelablePromise | Promise<unknown> | unknown)
+    | CancelablePromise,
   TResult = Awaited<
-    TSource extends TCancelablePromise
+    TSource extends CancelablePromise
       ? TSource
       : ReturnType<TSource extends Function ? TSource : never>
   >
@@ -120,7 +119,7 @@ export const tryCatchPromise = async <
     exceptionHandlingType = 'error',
     ignoreCancel = true,
   } = config || {};
-  let promise: TCancelablePromise<TResult> = null;
+  let promise: CancelablePromise<TResult> = null;
   let result: TResult = null;
   let error: TError = null;
 
@@ -129,7 +128,7 @@ export const tryCatchPromise = async <
 
     // if the source is a CancelablePromise, just await it
     if (isSourceCancelablePromise) {
-      promise = source as unknown as TCancelablePromise<TResult>;
+      promise = source as unknown as CancelablePromise<TResult>;
       result = await promise;
 
       return;
@@ -138,7 +137,7 @@ export const tryCatchPromise = async <
     // if the source is a function we need to execute it
     const callbackResult = (
       source as () => unknown
-    )() as TCancelablePromise<TResult>;
+    )() as CancelablePromise<TResult>;
 
     const isCancelableResultCancelablePromise =
       callbackResult instanceof CancelablePromise;

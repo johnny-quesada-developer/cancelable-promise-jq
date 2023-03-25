@@ -104,7 +104,9 @@ describe('tryCatchPromise', () => {
       cancelablePromise.cancel();
     }, 0);
 
-    const { result, error, promise } = await tryCatchPromise(cancelablePromise);
+    const { result, error, promise } = await tryCatchPromise(
+      () => cancelablePromise
+    );
 
     expect(result).toBeNull();
     expect(error).toBeNull();
@@ -125,7 +127,7 @@ describe('tryCatchPromise', () => {
     }, 0);
 
     const { result, error, promise } = await tryCatchPromise(
-      cancelablePromise,
+      () => cancelablePromise,
       {
         defaultResult: 'default',
       }
