@@ -18,6 +18,11 @@ export type TCancelablePromiseCallback<TResult = unknown> = (
   utils: TCancelablePromiseUtils<TResult>
 ) => void;
 
+/**
+ * Callback for the reportProgress event of the promise.
+ */
+export type TOnProgressCallback = (progressPercentage: number) => void;
+
 export type TCancelablePromiseBuildCallback<T = unknown> = () =>
   | Promise<T>
   | TCancelablePromise<T>;

@@ -6,6 +6,7 @@ import {
   TCancelCallback,
   TCancelablePromiseCallback,
   TCancelablePromiseData,
+  TOnProgressCallback,
 } from './CancelablePromise.types';
 
 /**
@@ -51,6 +52,11 @@ export class CancelablePromise<TResult>
 
   private cancelCallbacks: TCancelCallback[] = [];
   private ownCancelCallbacks: TCancelCallback[] = [];
+
+  /**
+   * The callbacks to be called when reportProgress is called.
+   */
+  private onProgressCallbacks: TOnProgressCallback[];
 
   /**
    * Resolve the promise.
@@ -150,6 +156,58 @@ export class CancelablePromise<TResult>
   };
 
   /**
+   * This method allows to report the progress of the message from the main thread in the onProgress callback
+   * */
+  public onProgress = (callback: TOnProgressCallback) => {
+    this.onProgressCallbacks.push(callback);
+
+    return this;
+  };
+
+  /**
+   * This allows to report progress across the chain of promises,
+   * this is useful when you have an async operation that could take a long time and you want to report the progress to the user.
+   */
+  public reportProgress = (progressPercentage: number) => {
+    this.onProgressCallbacks.forEach((callback) =>
+      callback(progressPercentage)
+    );
+
+    return this;
+  };
+
+  /**
+   * Returns a Promise that resolves or rejects as soon as the previous promise is resolved or rejected,
+   * with cancelable promise you can call the cancel method on the child promise to cancel all the parent promises.
+   * inherits the onProgressCallbacks array from the parent promise to the child promise so the progress can be reported across the chain
+   */
+  private createChildPromise = <TResult1>() => {
+    let resolve: TResolveCallback<TResult1>;
+    let reject: TRejectCallback;
+
+    const promise = new CancelablePromise<TResult1>(
+      (_resolve, _reject, _utils) => {
+        resolve = _resolve;
+        reject = _reject;
+      }
+    );
+
+    // share the reference of the onProgressCallbacks array between the promises so the progress can be reported
+    promise.onProgressCallbacks = this.onProgressCallbacks;
+
+    // cancels the parent promise when the child promise is canceled
+    promise.onCancel((reason) => {
+      this.cancel(reason);
+    });
+
+    return {
+      promise,
+      resolve,
+      reject,
+    };
+  };
+
+  /**
    * Returns a Promise that resolves or rejects as soon as the previous promise is resolved or rejected,
    * with cancelable promise you can call the cancel method on the child promise to cancel all the parent promises.
    * @param {((value: TResult) => TResult1 | PromiseLike<TResult1>) | undefined | null} [onfulfilled] the callback to be called when the promise is resolved
@@ -179,21 +237,8 @@ export class CancelablePromise<TResult>
       | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
       | undefined
       | null
-  ) {
-    let resolve: TResolveCallback<TResult1>;
-    let reject: TRejectCallback;
-
-    const cancelable = new CancelablePromise<TResult1>(
-      (_resolve, _reject, _utils) => {
-        resolve = _resolve;
-        reject = _reject;
-      }
-    );
-
-    // cancels the parent promise when the child promise is canceled
-    cancelable.onCancel((reason) => {
-      this.cancel(reason);
-    });
+  ): CancelablePromise<TResult1> {
+    const { promise, resolve, reject } = this.createChildPromise<TResult1>();
 
     super
       .then(onfulfilled, onrejected)
@@ -202,7 +247,7 @@ export class CancelablePromise<TResult>
         reject
       );
 
-    return cancelable;
+    return promise;
   }
 
   /**
@@ -224,19 +269,10 @@ export class CancelablePromise<TResult>
    *
    * childPromise.cancel();
    * */
-  public catch<T = never>(onrejected?: (reason: any) => T | PromiseLike<T>) {
-    let resolve: TResolveCallback<T>;
-    let reject: TRejectCallback;
-
-    const cancelable = new CancelablePromise<T>((_resolve, _reject, _utils) => {
-      resolve = _resolve;
-      reject = _reject;
-    });
-
-    // cancels the parent promise when the child promise is canceled
-    cancelable.onCancel((reason) => {
-      this.cancel(reason);
-    });
+  public catch<T = never>(
+    onrejected?: (reason: any) => T | PromiseLike<T>
+  ): CancelablePromise<T> {
+    const { promise, resolve, reject } = this.createChildPromise<T>();
 
     super
       .catch(onrejected)
@@ -245,7 +281,7 @@ export class CancelablePromise<TResult>
         reject
       );
 
-    return cancelable;
+    return promise;
   }
 }
 
