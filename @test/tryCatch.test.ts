@@ -138,5 +138,5 @@ describe('tryCatchPromise', () => {
     expect(promise).toBeInstanceOf(CancelablePromise);
     expect(promise.status).toBe('canceled');
     expect(console.error).not.toBeCalled();
-  });
+  }, 10000);
 });

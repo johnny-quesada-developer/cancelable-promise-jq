@@ -7,17 +7,17 @@ export type TResolveCallback<TResult> = (
 export type TRejectCallback = (reason?: unknown) => void;
 export type TCancelCallback = (reason?: unknown) => void;
 
-export type CancelablePromiseUtils<TResult = unknown> = {
+export type TCancelablePromiseUtils<TResult = unknown> = {
   cancel: (reason?: unknown) => CancelablePromise<TResult>;
   onCancel: (callback: TCancelCallback) => CancelablePromise<TResult>;
   onProgress: (callback: TOnProgressCallback) => CancelablePromise<TResult>;
   reportProgress: (progressPercentage: number) => void;
 };
 
-export type CancelablePromiseCallback<TResult = unknown> = (
+export type TCancelablePromiseCallback<TResult = unknown> = (
   resolve: TResolveCallback<TResult>,
   reject: TRejectCallback,
-  utils: CancelablePromiseUtils<TResult>
+  utils: TCancelablePromiseUtils<TResult>
 ) => void;
 
 /**
@@ -29,7 +29,7 @@ export type TCancelablePromiseBuildCallback<T = unknown> = () =>
   | Promise<T>
   | CancelablePromise<T>;
 
-export type CancelablePromiseData = Record<string, unknown> & {
+export type TCancelablePromiseData = Record<string, unknown> & {
   group?: {
     promises: CancelablePromise[];
   };
@@ -39,7 +39,7 @@ export type TDecoupledCancelablePromise<TResult = unknown> = {
   promise: CancelablePromise<TResult>;
   resolve: TResolveCallback<TResult>;
   reject: TRejectCallback;
-} & CancelablePromiseUtils<TResult>;
+} & TCancelablePromiseUtils<TResult>;
 
 export type TCancelablePromiseGroupConfig = {
   maxConcurrent?: number;
@@ -54,8 +54,8 @@ export type TCancelablePromiseGroupConfig = {
  * It is a Promise that has a status property that can be 'pending', 'resolved', 'rejected' or 'canceled'.
  * It has an onCancel method that allows to register a callback that will be called when the promise is canceled.
  * It has a cancel method that allows to cancel the promise.
- * @param {CancelablePromiseCallback<TResult>} [callback] the callback of the promise, it will receive the resolve, reject and cancel functions
- * @param {CancelablePromiseData<TMetadata>} [data] the data of the promise
+ * @param {TCancelablePromiseCallback<TResult>} [callback] the callback of the promise, it will receive the resolve, reject and cancel functions
+ * @param {TCancelablePromiseData<TMetadata>} [data] the data of the promise
  * @constructor
  * @example
  * const promise = new CancelablePromise((resolve, reject, utils) => {
@@ -85,7 +85,7 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
   /**
    * extra data of the promise util for debugging
    */
-  public data: CancelablePromiseData = {};
+  public data: TCancelablePromiseData = {};
 
   private cancelCallbacks: TCancelCallback[] = [];
   private ownCancelCallbacks: TCancelCallback[] = [];
@@ -93,7 +93,7 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
   /**
    * The callbacks to be called when reportProgress is called.
    */
-  private onProgressCallbacks: TOnProgressCallback[];
+  private onProgressCallbacks: TOnProgressCallback[] = [];
 
   /**
    * Resolve the promise.
@@ -107,7 +107,7 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    * */
   private reject: TRejectCallback;
 
-  constructor(callback: CancelablePromiseCallback<TResult>) {
+  constructor(callback: TCancelablePromiseCallback<TResult>) {
     let resolve: TResolveCallback<TResult>;
     let reject: TRejectCallback;
 
@@ -120,7 +120,7 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
     this.resolve = resolve;
     this.reject = reject;
 
-    // execute the custom callback with cancelable fuctions
+    // execute the custom callback with cancelable functions
     callback(
       (value) => {
         this.status = 'resolved';
@@ -147,6 +147,51 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
         },
       }
     );
+
+    /**
+     * Override the then method to return a CancelablePromise.
+     * We need to override this here to avoid the bundler to polyfill the Promise.
+     */
+    this.then = <TResult1 = TResult, TResult2 = never>(
+      onfulfilled?:
+        | ((value: TResult) => TResult1 | PromiseLike<TResult1>)
+        | undefined
+        | null,
+      onrejected?:
+        | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+        | undefined
+        | null
+    ): CancelablePromise<TResult1> => {
+      const { promise, resolve, reject } = this.createChildPromise<TResult1>();
+
+      super
+        .then(onfulfilled, onrejected)
+        .then(
+          resolve as (value: TResult1 | TResult2) => void | PromiseLike<void>,
+          reject
+        );
+
+      return promise;
+    };
+
+    /**
+     * Override the catch method to return a CancelablePromise.
+     * We need to override this here to avoid the bundler to polyfill the Promise.
+     * */
+    this.catch = <T = never>(
+      onrejected?: (reason: any) => T | PromiseLike<T>
+    ): CancelablePromise<T> => {
+      const { promise, resolve, reject } = this.createChildPromise<T>();
+
+      super
+        .catch(onrejected)
+        .then(
+          resolve as (value: TResult | T) => void | PromiseLike<void>,
+          reject
+        );
+
+      return promise;
+    };
   }
 
   /**
@@ -267,7 +312,7 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    * console.log(childPromise.status); // 'canceled'
    * console.log(promise.status); // 'canceled'
    */
-  public then<TResult1 = TResult, TResult2 = never>(
+  public then: <TResult1 = TResult, TResult2 = never>(
     onfulfilled?:
       | ((value: TResult) => TResult1 | PromiseLike<TResult1>)
       | undefined
@@ -276,18 +321,7 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
       | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
       | undefined
       | null
-  ): CancelablePromise<TResult1> {
-    const { promise, resolve, reject } = this.createChildPromise<TResult1>();
-
-    super
-      .then(onfulfilled, onrejected)
-      .then(
-        resolve as (value: TResult1 | TResult2) => void | PromiseLike<void>,
-        reject
-      );
-
-    return promise;
-  }
+  ) => CancelablePromise<TResult1>;
 
   /**
    * Returns a Promise that resolves when the previous promise is rejected,
@@ -308,20 +342,9 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    *
    * childPromise.cancel();
    * */
-  public catch<T = never>(
+  public catch: <T = never>(
     onrejected?: (reason: any) => T | PromiseLike<T>
-  ): CancelablePromise<T> {
-    const { promise, resolve, reject } = this.createChildPromise<T>();
-
-    super
-      .catch(onrejected)
-      .then(
-        resolve as (value: TResult | T) => void | PromiseLike<void>,
-        reject
-      );
-
-    return promise;
-  }
+  ) => CancelablePromise<T>;
 }
 
 /**

@@ -1,5 +1,6 @@
 import {
   CancelablePromise,
+  createDecoupledPromise,
   toCancelablePromise,
 } from '../../CancelablePromise';
 import {
@@ -100,7 +101,7 @@ export const tryCatch = <
  * console.log(result); // null
  * console.log(status); // rejected
  */
-export const tryCatchPromise = async <
+export const tryCatchPromise = <
   TError,
   TSource extends
     | (() => CancelablePromise | Promise<unknown> | unknown)
@@ -119,9 +120,22 @@ export const tryCatchPromise = async <
     exceptionHandlingType = 'error',
     ignoreCancel = true,
   } = config || {};
+
   let promise: CancelablePromise<TResult> = null;
   let result: TResult = null;
   let error: TError = null;
+
+  const logger = (_error: TError) => {
+    error = _error as TError;
+    result = errorResult as TResult;
+
+    if (exceptionHandlingType == 'ignore') return;
+
+    const isCancel = promise.status === 'canceled';
+    if (isCancel && ignoreCancel) return;
+
+    console[exceptionHandlingType](error);
+  };
 
   try {
     const isSourceCancelablePromise = source instanceof CancelablePromise;
@@ -129,9 +143,26 @@ export const tryCatchPromise = async <
     // if the source is a CancelablePromise, just await it
     if (isSourceCancelablePromise) {
       promise = source as unknown as CancelablePromise<TResult>;
-      result = await promise;
 
-      return;
+      return new Promise((resolve) => {
+        promise
+          .then((result) => {
+            return {
+              error: null,
+              result,
+              promise,
+            };
+          })
+          .catch((error) => {
+            logger(error as TError);
+
+            return {
+              error: error,
+              result: errorResult as TResult,
+              promise,
+            };
+          });
+      });
     }
 
     // if the source is a function we need to execute it
@@ -147,23 +178,32 @@ export const tryCatchPromise = async <
       ? callbackResult
       : toCancelablePromise(callbackResult);
 
-    // await the promise
-    result = await promise;
+    return new Promise((resolve) => {
+      promise
+        .then((result) => {
+          resolve({
+            error: null,
+            result,
+            promise,
+          });
+        })
+        .catch((error) => {
+          logger(error as TError);
+
+          resolve({
+            error: error,
+            result: errorResult as TResult,
+            promise,
+          });
+        });
+    });
   } catch (_error) {
-    error = _error as TError;
-    result = errorResult as TResult;
+    logger(_error as TError);
 
-    if (exceptionHandlingType == 'ignore') return;
-
-    const isCancel = promise.status === 'canceled';
-    if (isCancel && ignoreCancel) return;
-
-    console[exceptionHandlingType](error);
-  } finally {
-    return {
+    return Promise.resolve({
       error,
-      result,
+      result: errorResult as TResult,
       promise,
-    };
+    });
   }
 };

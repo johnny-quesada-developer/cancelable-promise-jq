@@ -1,6 +1,6 @@
 import {
   CancelablePromise,
-  CancelablePromiseUtils,
+  TCancelablePromiseUtils,
   TDecoupledCancelablePromise,
   TRejectCallback,
   TResolveCallback,
@@ -32,7 +32,7 @@ export const createDecoupledPromise = <
 >(): TDecoupledCancelablePromise<TResult> => {
   let resolve: TResolveCallback<TResult>;
   let reject: TRejectCallback;
-  let utils: CancelablePromiseUtils<TResult>;
+  let utils: TCancelablePromiseUtils<TResult>;
 
   const promise = new CancelablePromise<TResult>(
     (_resolve, _reject, _utils) => {
@@ -83,7 +83,7 @@ export const toCancelablePromise = <
   let reject: TRejectCallback;
 
   const cancelable = new CancelablePromise<TResult>(
-    async (_resolve, _reject, _utils) => {
+    (_resolve, _reject, _utils) => {
       resolve = _resolve;
       reject = _reject;
 
@@ -146,7 +146,7 @@ export const groupAsCancelablePromise = <TResult extends Array<unknown>>(
   const {
     maxConcurrent = 8,
     executeInOrder = false,
-    beforeEachCallback: beforeEachcCallback = null,
+    beforeEachCallback = null,
     afterEachCallback = null,
     onQueueEmptyCallback = null,
   } = config;
@@ -154,15 +154,15 @@ export const groupAsCancelablePromise = <TResult extends Array<unknown>>(
   const queue = [...sources];
   const results: TResult = [] as TResult;
 
-  return new CancelablePromise<TResult>(async (resolve, _, promiseUtils) => {
-    const loadCallbacksBatchAsync = async () => {
+  return new CancelablePromise<TResult>((resolve, _, promiseUtils) => {
+    const loadCallbacksBatchAsync = () => {
       if (!queue.length) return;
 
       // we execute the first batch of callbacks in the queue
-      const promises = queue.splice(0, maxConcurrent).map(async (callback) => {
+      const promises = queue.splice(0, maxConcurrent).map((callback) => {
         const result = typeof callback === 'function' ? callback() : callback;
 
-        beforeEachcCallback?.();
+        beforeEachCallback?.();
 
         const promise = toCancelablePromise(result);
 
@@ -178,21 +178,21 @@ export const groupAsCancelablePromise = <TResult extends Array<unknown>>(
         });
 
         // if executeInOrder is true, we wait for the promise to resolve before executing the next callback
-        return executeInOrder ? await promise : promise;
+        return executeInOrder ? promise.then((result) => result) : promise;
       });
 
-      await Promise.all(promises);
-
-      // we execute the next batch of callbacks in the queue recursively until the queue is empty
-      await loadCallbacksBatchAsync();
+      return Promise.all(promises).then(() => {
+        // we execute the next batch of callbacks in the queue recursively until the queue is empty
+        return loadCallbacksBatchAsync();
+      });
     };
 
-    await loadCallbacksBatchAsync();
+    return loadCallbacksBatchAsync().then(() => {
+      onQueueEmptyCallback?.(results);
 
-    onQueueEmptyCallback?.(results);
-
-    // once the queue is empty, we return the results of the promises in the queue
-    resolve(results);
+      // once the queue is empty, we return the results of the promises in the queue
+      resolve(results);
+    });
   });
 };
 
