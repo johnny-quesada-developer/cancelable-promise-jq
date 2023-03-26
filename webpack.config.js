@@ -12,6 +12,12 @@ module.exports = {
   },
   resolve: {
     extensions: ['.ts', '.js'],
+    alias: {
+      'cancelable-promise-jq': path.resolve(
+        __dirname,
+        'node_modules/cancelable-promise-jq/package.json'
+      ),
+    },
   },
   module: {
     rules: [

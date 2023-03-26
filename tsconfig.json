@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2016",
-    "module": "commonjs",
+    "module": "esnext",
     "lib": ["es2016"],
     "declaration": true,
     "outDir": "./lib",
@@ -16,6 +16,7 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": false,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "pretty": true,
