@@ -11,7 +11,7 @@ export type TCancelablePromiseUtils<TResult = unknown> = {
   cancel: (reason?: unknown) => CancelablePromise<TResult>;
   onCancel: (callback: TCancelCallback) => CancelablePromise<TResult>;
   onProgress: (callback: TOnProgressCallback) => CancelablePromise<TResult>;
-  reportProgress: (progressPercentage: number) => void;
+  reportProgress: (percentage: number, metadata?: unknown) => void;
 };
 
 export type TCancelablePromiseCallback<TResult = unknown> = (
@@ -23,7 +23,10 @@ export type TCancelablePromiseCallback<TResult = unknown> = (
 /**
  * Callback for the reportProgress event of the promise.
  */
-export type TOnProgressCallback = (progressPercentage: number) => void;
+export type TOnProgressCallback = (
+  progress: number,
+  metadata?: unknown
+) => void;
 
 export type TCancelablePromiseBuildCallback<T = unknown> = () =>
   | Promise<T>
@@ -142,8 +145,8 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
         onProgress: (callback) => {
           return this.onProgress(callback);
         },
-        reportProgress: (progressPercentage) => {
-          this.reportProgress(progressPercentage);
+        reportProgress: (percentage, metadata) => {
+          this.reportProgress(percentage, metadata);
         },
       }
     );
@@ -252,9 +255,9 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    * This allows to report progress across the chain of promises,
    * this is useful when you have an async operation that could take a long time and you want to report the progress to the user.
    */
-  public reportProgress = (progressPercentage: number) => {
+  public reportProgress = (percentage: number, metadata?: unknown) => {
     this.onProgressCallbacks.forEach((callback) =>
-      callback(progressPercentage)
+      callback(percentage, metadata)
     );
 
     return this;
