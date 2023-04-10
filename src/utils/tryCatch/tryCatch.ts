@@ -1,8 +1,8 @@
 import {
   CancelablePromise,
-  createDecoupledPromise,
   toCancelablePromise,
 } from '../../CancelablePromise';
+
 import {
   TTryCatchCallbackConfig,
   TTryCatchCallbackPromiseConfig,

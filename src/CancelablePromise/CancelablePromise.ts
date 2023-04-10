@@ -85,11 +85,6 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    */
   public status: TPromiseStatus = 'pending';
 
-  /**
-   * extra data of the promise util for debugging
-   */
-  public data: TCancelablePromiseData = {};
-
   private cancelCallbacks: TCancelCallback[] = [];
   private ownCancelCallbacks: TCancelCallback[] = [];
 
@@ -188,6 +183,24 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
 
       super
         .catch(onrejected)
+        .then(
+          resolve as (value: TResult | T) => void | PromiseLike<void>,
+          reject
+        );
+
+      return promise;
+    };
+
+    /**
+     * Override the finally method to return a CancelablePromise.
+     */
+    this.finally = <T = never>(
+      onfinally?: () => void
+    ): CancelablePromise<T> => {
+      const { promise, resolve, reject } = this.createChildPromise<T>();
+
+      super
+        .finally(onfinally)
         .then(
           resolve as (value: TResult | T) => void | PromiseLike<void>,
           reject
@@ -347,6 +360,13 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    * */
   public catch: <T = never>(
     onrejected?: (reason: any) => T | PromiseLike<T>
+  ) => CancelablePromise<T>;
+
+  /**
+   * Subscribe a callback to be called when the promise is resolved or rejected,
+   */
+  public finally: <T = never>(
+    onfinally?: (() => void) | undefined | null
   ) => CancelablePromise<T>;
 }
 
