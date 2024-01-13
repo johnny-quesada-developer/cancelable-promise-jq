@@ -94,17 +94,23 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    */
   private onProgressCallbacks: Set<TOnProgressCallback> = new Set();
 
+  private disposeCallbacks = () => {
+    this.cancelCallbacks = new Set();
+    this.ownCancelCallbacks = new Set();
+    this.onProgressCallbacks = new Set();
+  };
+
   /**
    * Resolve the promise.
    * @param {TResult} [value] the value of the resolution
    * */
-  private resolve: TResolveCallback<TResult>;
+  private _resolve: TResolveCallback<TResult>;
 
   /**
    * Cancel the promise.
    * @param {unknown} [reason] the reason of the cancellation
    * */
-  private reject: TRejectCallback;
+  private _reject: TRejectCallback;
 
   constructor(callback: TCancelablePromiseCallback<TResult>) {
     let resolve: TResolveCallback<TResult>;
@@ -116,18 +122,23 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
       reject = _reject;
     });
 
-    this.resolve = resolve;
-    this.reject = reject;
+    this._resolve = resolve;
+    this._reject = reject;
 
     // execute the custom callback with cancelable functions
     callback(
       (value) => {
         this.status = 'resolved';
-        this.resolve(value);
+        this.disposeCallbacks();
+
+        this._resolve(value);
+
       },
       (reason) => {
         this.status = 'rejected';
-        this.reject(reason);
+        this.disposeCallbacks();
+
+        this._reject(reason);
       },
       {
         cancel: (reason) => {
@@ -240,11 +251,9 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
     // then the promise cancel second level subscribers
     this.cancelCallbacks.forEach((callback) => callback(reason));
 
-    this.reject(reason);
-    this.cancelCallbacks = new Set();
-    this.ownCancelCallbacks = new Set();
-    this.onProgressCallbacks = new Set();
-
+    this._reject(reason);
+    this.disposeCallbacks();
+   
     return this;
   };
 

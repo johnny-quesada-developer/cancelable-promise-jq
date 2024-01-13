@@ -25,40 +25,40 @@ describe('CancelablePromise', () => {
     expect(promise.status).toBe('resolved');
   });
 
-  it('should reject the promise', async () => {
+  it('should reject the promise', () => {
     const promise = new CancelablePromise<string>((_, reject) => {
       reject('error');
     });
 
-    promise.catch((error) => {
+    return promise.catch((error) => {
       expect(error).toBe('error');
       expect(promise.status).toBe('rejected');
     });
   });
 
-  it('should cancel the promise', async () => {
+  it('should cancel the promise', () => {
     const promise = new CancelablePromise<string>((_, __, utils) => {
       utils.cancel();
     });
 
-    promise.catch((error) => {
+    return promise.catch((error) => {
       expect(error).toBe(null);
       expect(promise.status).toBe('canceled');
     });
   });
 
-  it('should cancel the promise with a custom error', async () => {
+  it('should cancel the promise with a custom error', () => {
     const promise = new CancelablePromise<string>((_, __, utils) => {
       utils.cancel('error');
     });
 
-    promise.catch((error) => {
+    return promise.catch((error) => {
       expect(error).toBe('error');
       expect(promise.status).toBe('canceled');
     });
   });
 
-  it('it should execute the own onCancel callback', async () => {
+  it('it should execute the own onCancel callback', () => {
     expect.assertions(1);
 
     const promise = new CancelablePromise<string>((_, __, utils) => {
@@ -67,7 +67,7 @@ describe('CancelablePromise', () => {
       });
     });
 
-    promise.cancel().catch(() => {
+    return promise.cancel().catch(() => {
       expect(console.info).toBeCalledWith('onCancel');
     });
   });
@@ -92,7 +92,7 @@ describe('CancelablePromise', () => {
       });
   });
 
-  it('should cancell all the chained promises if cancel is called', async () => {
+  it('should cancel all the chained promises if cancel is called', () => {
     expect.assertions(3);
 
     const promise = new CancelablePromise((resolve, reject, utils) => {
@@ -138,10 +138,10 @@ describe('CancelablePromise', () => {
         return 'handled';
       });
 
-    promise.cancel('canceled');
+    return promise.cancel('canceled').catch(() => {});
   });
 
-  it('should cancell all the chained promises if cancel is called', async () => {
+  it('should cancel all the chained promises if cancel is called', () => {
     const promise = new CancelablePromise((resolve) => {
       setTimeout(() => {
         resolve();
@@ -152,7 +152,7 @@ describe('CancelablePromise', () => {
       return 'result';
     });
 
-    childPromise.cancel().catch(() => {
+    return childPromise.cancel().catch(() => {
       expect(childPromise.status).toBe('canceled');
       expect(promise.status).toBe('canceled');
     });
