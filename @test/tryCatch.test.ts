@@ -2,11 +2,6 @@ import { CancelablePromise } from '../src/CancelablePromise';
 import { tryCatch, tryCatchPromise } from '../src/utils';
 
 describe('tryCatch', () => {
-
-  beforeEach(() => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
-
   it('should return the result of the function', () => {
     const { result, error } = tryCatch(() => 'result');
 
@@ -54,19 +49,19 @@ describe('tryCatchPromise', () => {
     expect(result).toBe('result');
     expect(error).toBeNull();
     expect(promise).toBeInstanceOf(CancelablePromise);
-    expect(promise?.status).toBe('resolved');
+    expect(promise.status).toBe('resolved');
     expect(console.error).not.toBeCalled();
   });
 
   it('should return the error of the function', async () => {
-    const { result, error, promise } = await tryCatchPromise(() => {
-      return Promise.reject(Error('error'));
+    const { result, error, promise } = await tryCatchPromise(async () => {
+      throw new Error('error');
     });
 
     expect(result).toBeNull();
     expect(error).toBeInstanceOf(Error);
     expect(promise).toBeInstanceOf(CancelablePromise);
-    expect(promise?.status).toBe('rejected');
+    expect(promise.status).toBe('rejected');
     expect(console.error).toBeCalled();
   });
 
@@ -81,7 +76,7 @@ describe('tryCatchPromise', () => {
     expect(result).toBe('default');
     expect(error).toBeInstanceOf(Error);
     expect(promise).toBeInstanceOf(CancelablePromise);
-    expect(promise?.status).toBe('rejected');
+    expect(promise.status).toBe('rejected');
     expect(console.error).toBeCalled();
   });
 
@@ -94,15 +89,11 @@ describe('tryCatchPromise', () => {
     expect(result).toBe('result');
     expect(error).toBeNull();
     expect(promise).toBeInstanceOf(CancelablePromise);
-    expect(promise?.status).toBe('resolved');
+    expect(promise.status).toBe('resolved');
     expect(console.error).not.toBeCalled();
   });
 
-  /**
-   * This test is skipped cause the unhandled promise rejection stops nodejs execution
-   * but the tryCatchPromise works as expected, and the success message is logged.
-  */
-  it.skip('should return error when promise is canceled', async () => {
+  it('should return error when promise is canceled', async () => {
     const cancelablePromise = new CancelablePromise<string>((resolve) => {
       setTimeout(() => {
         resolve('result');
@@ -120,17 +111,11 @@ describe('tryCatchPromise', () => {
     expect(result).toBeNull();
     expect(error).toBeNull();
     expect(promise).toBeInstanceOf(CancelablePromise);
-    expect(promise?.status).toBe('canceled');
+    expect(promise.status).toBe('canceled');
     expect(console.error).not.toBeCalled();
-
-    console.log('%csuccess', 'color: green; font-weight: bold;');
   });
 
-  /**
-  * This test is skipped cause the unhandled promise rejection stops nodejs execution
-  * but the tryCatchPromise works as expected, and the success message is logged.
-  */
-  it.skip('should return error when promise is canceled and the default result is set', async () => {
+  it('should return error when promise is canceled and the default result is set', async () => {
     const cancelablePromise = new CancelablePromise<string>((resolve) => {
       setTimeout(() => {
         resolve('result');
@@ -151,7 +136,7 @@ describe('tryCatchPromise', () => {
     expect(result).toBe('default');
     expect(error).toBeNull();
     expect(promise).toBeInstanceOf(CancelablePromise);
-    expect(promise?.status).toBe('canceled');
+    expect(promise.status).toBe('canceled');
     expect(console.error).not.toBeCalled();
   }, 10000);
 });

@@ -5,9 +5,6 @@ const avoidConsoleWarn = true;
 const avoidConsoleInfo = true;
 
 beforeEach(() => {
-  process.setUncaughtExceptionCaptureCallback(null);
-  process.setUncaughtExceptionCaptureCallback(() => {});
-
   jest.spyOn(console, 'warn').mockImplementation((...args) => {
     if (avoidConsoleWarn) return;
 

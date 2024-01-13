@@ -22,6 +22,6 @@ export type TTryCatchPromiseResult<
   TError = unknown
 > = Promise<
   TTryCatchResult<TResult, TError> & {
-    promise?: CancelablePromise<TResult>;
+    promise: CancelablePromise<TResult>;
   }
 >;
