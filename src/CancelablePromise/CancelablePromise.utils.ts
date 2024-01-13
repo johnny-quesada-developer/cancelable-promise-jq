@@ -96,9 +96,11 @@ export const toCancelablePromise = <
     }
   );
 
-  cancelable.onCancel((reason) => {
+  const unSubscribe = cancelable.onCancel((reason) => {
     reject(reason);
   });
+
+  cancelable.then(unSubscribe);
 
   return cancelable;
 };
@@ -161,22 +163,27 @@ export const groupAsCancelablePromise = <TResult extends Array<unknown>>(
       if (!queue.length) return;
 
       // we execute the first batch of callbacks in the queue
-      const promises = queue.splice(0, maxConcurrent).map((callback) => {
-        const result = typeof callback === 'function' ? callback() : callback;
+      const promises = queue.splice(0, maxConcurrent).map((source) => {
+        const result = typeof source === 'function' ? source() : source;
 
         beforeEachCallback?.();
 
         const promise = toCancelablePromise(result);
 
         // we cancel the promise if the group promise is canceled
-        promiseUtils.onCancel(() => {
+        const unSubscribe = promiseUtils.onCancel(() => {
           promise.cancel();
         });
-
+       
         promise.then((result) => {
+          //we cannot cancel the promise after it has been resolved
+          unSubscribe();
+
           results.push(result as unknown as TResult[0]);
 
           afterEachCallback?.(result);
+
+          promiseUtils.reportProgress(((results.length ?? 1) / (sources.length ?? 1)) * 100);
         });
 
         // if executeInOrder is true, we wait for the promise to resolve before executing the next callback
@@ -189,7 +196,7 @@ export const groupAsCancelablePromise = <TResult extends Array<unknown>>(
       });
     };
 
-    return loadCallbacksBatchAsync().then(() => {
+    loadCallbacksBatchAsync().then(() => {
       onQueueEmptyCallback?.(results);
 
       // once the queue is empty, we return the results of the promises in the queue
@@ -237,10 +244,13 @@ export const allSettledCancelable = <T extends readonly unknown[] | []>(
 
   return new CancelablePromise(async (resolve, _, tools) => {
     // allow to cancel the group of promises when the allSettled promise is canceled
-    tools.onCancel(group.cancel);
-
+    const unSubscribe = tools.onCancel(group.cancel);
+    
     // wait for all the promises to be settled no matter if they are resolved or rejected
     const result = await Promise.all(promises);
+
+    // we cannot cancel the group of promises after they have been resolved
+    unSubscribe();
 
     // return the tryCatchPromise results
     resolve(result as any);

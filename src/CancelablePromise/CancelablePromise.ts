@@ -6,11 +6,12 @@ export type TResolveCallback<TResult> = (
 
 export type TRejectCallback = (reason?: unknown) => void;
 export type TCancelCallback = (reason?: unknown) => void;
+export type TSubscription = () => void;
 
 export type TCancelablePromiseUtils<TResult = unknown> = {
   cancel: (reason?: unknown) => CancelablePromise<TResult>;
-  onCancel: (callback: TCancelCallback) => CancelablePromise<TResult>;
-  onProgress: (callback: TOnProgressCallback) => CancelablePromise<TResult>;
+  onCancel: (callback: TCancelCallback) => TSubscription;
+  onProgress: (callback: TOnProgressCallback) => TSubscription;
   reportProgress: (percentage: number, metadata?: unknown) => void;
 };
 
@@ -85,13 +86,13 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    */
   public status: TPromiseStatus = 'pending';
 
-  private cancelCallbacks: TCancelCallback[] = [];
-  private ownCancelCallbacks: TCancelCallback[] = [];
+  private cancelCallbacks: Set<TCancelCallback> = new Set();
+  private ownCancelCallbacks: Set<TCancelCallback> = new Set();
 
   /**
    * The callbacks to be called when reportProgress is called.
    */
-  private onProgressCallbacks: TOnProgressCallback[] = [];
+  private onProgressCallbacks: Set<TOnProgressCallback> = new Set();
 
   /**
    * Resolve the promise.
@@ -132,12 +133,10 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
         cancel: (reason) => {
           return this.cancel(reason);
         },
-        onCancel: (callback) => {
-          this.subscribeToOwnCancelEvent(callback);
-
-          return this;
+        onCancel: (callback): TSubscription => {
+          return this.subscribeToOwnCancelEvent(callback);
         },
-        onProgress: (callback) => {
+        onProgress: (callback): TSubscription => {
           return this.onProgress(callback);
         },
         reportProgress: (percentage, metadata) => {
@@ -214,10 +213,14 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    * Subscribe to the cancel event of the promise.
    * @param {TCancelCallback} callback the callback to be called when the promise is canceled
    * */
-  private subscribeToOwnCancelEvent: (callback: TCancelCallback) => void = (
+  private subscribeToOwnCancelEvent: (callback: TCancelCallback) => TSubscription = (
     callback
-  ) => {
-    this.ownCancelCallbacks.push(callback);
+  ) => {    
+    this.ownCancelCallbacks.add(callback);
+
+    return () => {
+      this.ownCancelCallbacks.delete(callback);
+    };
   };
 
   /**
@@ -238,8 +241,9 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
     this.cancelCallbacks.forEach((callback) => callback(reason));
 
     this.reject(reason);
-    this.cancelCallbacks = [];
-    this.ownCancelCallbacks = [];
+    this.cancelCallbacks = new Set();
+    this.ownCancelCallbacks = new Set();
+    this.onProgressCallbacks = new Set();
 
     return this;
   };
@@ -249,19 +253,23 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    * @param {TCancellablePromiseCallback} [callback] the callback to be called when the promise is canceled
    * @returns {CancelablePromise} the promise itself
    * */
-  public onCancel = (callback: TCancelCallback): CancelablePromise<TResult> => {
-    this.cancelCallbacks.push(callback);
+  public onCancel = (callback: TCancelCallback): TSubscription => {
+    this.cancelCallbacks.add(callback);
 
-    return this;
+    return () => {
+      this.cancelCallbacks.delete(callback);
+    };
   };
 
   /**
    * This method allows to report the progress across the chain of promises.
    * */
-  public onProgress = (callback: TOnProgressCallback) => {
-    this.onProgressCallbacks.push(callback);
+  public onProgress = (callback: TOnProgressCallback): TSubscription => {
+    this.onProgressCallbacks.add(callback);
 
-    return this;
+    return () => {
+      this.onProgressCallbacks.delete(callback);
+    };
   };
 
   /**
