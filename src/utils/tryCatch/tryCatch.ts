@@ -32,10 +32,10 @@ import {
 export const tryCatch = <
   TError,
   TFunction extends () => unknown,
-  TResult = ReturnType<TFunction>
+  TResult = ReturnType<TFunction>,
 >(
   callback: TFunction,
-  config: TTryCatchCallbackConfig<TResult> = {}
+  config: TTryCatchCallbackConfig<TResult> = {},
 ): TTryCatchResult<TResult, TError> => {
   const { defaultResult: errorResult = null, exceptionHandlingType = 'error' } =
     config;
@@ -110,10 +110,10 @@ export const tryCatchPromise = <
     TSource extends CancelablePromise
       ? TSource
       : ReturnType<TSource extends Function ? TSource : never>
-  >
+  >,
 >(
   source: TSource,
-  config?: TTryCatchCallbackPromiseConfig<TResult>
+  config?: TTryCatchCallbackPromiseConfig<TResult>,
 ): TTryCatchPromiseResult<TResult, TError> => {
   const {
     defaultResult: errorResult = null,
@@ -122,16 +122,14 @@ export const tryCatchPromise = <
   } = config || {};
 
   let promise: CancelablePromise<TResult> = null;
-  let result: TResult = null;
   let error: TError = null;
 
   const logger = (_error: TError) => {
     error = _error as TError;
-    result = errorResult as TResult;
 
     if (exceptionHandlingType == 'ignore') return;
 
-    const isCancel = promise.status === 'canceled';
+    const isCancel = promise?.status === 'canceled';
     if (isCancel && ignoreCancel) return;
 
     console[exceptionHandlingType](error);
@@ -144,31 +142,36 @@ export const tryCatchPromise = <
     if (isSourceCancelablePromise) {
       promise = source as unknown as CancelablePromise<TResult>;
 
-      return new Promise((resolve) => {
-        promise
-          .then((result) => {
-            return {
-              error: null,
-              result,
-              promise,
-            };
-          })
-          .catch((error) => {
-            logger(error as TError);
+      return promise
+        .then((result) => ({
+          error: null,
+          result,
+          promise,
+        }))
+        .catch((error) => {
+          logger(error as TError);
 
-            return {
-              error: error,
-              result: errorResult as TResult,
-              promise,
-            };
-          });
-      });
+          return {
+            error: error,
+            result: errorResult as TResult,
+            promise,
+          };
+        });
     }
 
     // if the source is a function we need to execute it
     const callbackResult = (
       source as () => unknown
     )() as CancelablePromise<TResult>;
+
+    if (callbackResult === undefined) {
+      // if the callback does not return a value they is no way to know if the promise is resolved or rejected, or if there was a value or an error as result
+      return Promise.reject(
+        Error(
+          'tryCatchPromise: callback parameter must return a value () => promise',
+        ),
+      );
+    }
 
     const isCancelableResultCancelablePromise =
       callbackResult instanceof CancelablePromise;
@@ -178,25 +181,21 @@ export const tryCatchPromise = <
       ? callbackResult
       : toCancelablePromise(callbackResult);
 
-    return new Promise((resolve) => {
-      promise
-        .then((result) => {
-          resolve({
-            error: null,
-            result,
-            promise,
-          });
-        })
-        .catch((error) => {
-          logger(error as TError);
+    return promise
+      .then((result) => ({
+        error: null,
+        result,
+        promise,
+      }))
+      .catch((error) => {
+        logger(error as TError);
 
-          resolve({
-            error: error,
-            result: errorResult as TResult,
-            promise,
-          });
-        });
-    });
+        return {
+          error: error,
+          result: errorResult as TResult,
+          promise,
+        };
+      });
   } catch (_error) {
     logger(_error as TError);
 

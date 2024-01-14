@@ -1,4 +1,5 @@
 import { tryCatchPromise, TTryCatchPromiseResult } from '../utils';
+import { CancelableAbortController } from './CancelableAbortController';
 
 import {
   CancelablePromise,
@@ -30,7 +31,7 @@ import {
  * // hello world
  */
 export const createDecoupledPromise = <
-  TResult
+  TResult,
 >(): TDecoupledCancelablePromise<TResult> => {
   let resolve: TResolveCallback<TResult>;
   let reject: TRejectCallback;
@@ -41,7 +42,7 @@ export const createDecoupledPromise = <
       resolve = _resolve;
       reject = _reject;
       utils = _utils;
-    }
+    },
   );
 
   return { resolve, reject, ...utils, promise };
@@ -68,16 +69,16 @@ export const toCancelablePromise = <
   T = unknown,
   TResult = T extends Promise<unknown>
     ? CancelablePromise<Awaited<T>>
-    : CancelablePromise<T>
+    : CancelablePromise<T>,
 >(
-  source: T
+  source: T,
 ): CancelablePromise<TResult> => {
   if (source instanceof CancelablePromise) return source;
   if (typeof source === 'function') return toCancelablePromise(source());
 
   if (!isPromise(source)) {
     return new CancelablePromise<TResult>((resolve) =>
-      resolve(source as unknown as TResult)
+      resolve(source as unknown as TResult),
     );
   }
 
@@ -91,9 +92,9 @@ export const toCancelablePromise = <
 
       source.then(
         resolve as (value: unknown) => void | PromiseLike<void>,
-        reject
+        reject,
       );
-    }
+    },
   );
 
   cancelable.onCancel((reason) => {
@@ -141,7 +142,7 @@ export const groupAsCancelablePromise = <TResult extends Array<unknown>>(
     | CancelablePromise<TResult>
     | Promise<unknown>
   )[],
-  config: TCancelablePromiseGroupConfig = {}
+  config: TCancelablePromiseGroupConfig = {},
 ): CancelablePromise<TResult> | null => {
   if (!sources.length) return null;
 
@@ -161,22 +162,29 @@ export const groupAsCancelablePromise = <TResult extends Array<unknown>>(
       if (!queue.length) return;
 
       // we execute the first batch of callbacks in the queue
-      const promises = queue.splice(0, maxConcurrent).map((callback) => {
-        const result = typeof callback === 'function' ? callback() : callback;
+      const promises = queue.splice(0, maxConcurrent).map((source) => {
+        const result = typeof source === 'function' ? source() : source;
 
         beforeEachCallback?.();
 
         const promise = toCancelablePromise(result);
 
         // we cancel the promise if the group promise is canceled
-        promiseUtils.onCancel(() => {
+        const unsubscribeCancel = promiseUtils.onCancel(() => {
           promise.cancel();
         });
 
         promise.then((result) => {
+          //we cannot cancel the promise after it has been resolved
+          unsubscribeCancel();
+
           results.push(result as unknown as TResult[0]);
 
           afterEachCallback?.(result);
+
+          promiseUtils.reportProgress(
+            ((results.length ?? 1) / (sources.length ?? 1)) * 100,
+          );
         });
 
         // if executeInOrder is true, we wait for the promise to resolve before executing the next callback
@@ -189,7 +197,7 @@ export const groupAsCancelablePromise = <TResult extends Array<unknown>>(
       });
     };
 
-    return loadCallbacksBatchAsync().then(() => {
+    loadCallbacksBatchAsync().then(() => {
       onQueueEmptyCallback?.(results);
 
       // once the queue is empty, we return the results of the promises in the queue
@@ -213,7 +221,7 @@ export const isPromise = (value: unknown): value is Promise<unknown> => {
  * Also groups the results as an array of TTryCatchPromiseResult<PromiseSettledResult<Awaited<T[P]>>>.
  */
 export const allSettledCancelable = <T extends readonly unknown[] | []>(
-  values: T
+  values: T,
 ): CancelablePromise<{
   -readonly [P in keyof T]: TTryCatchPromiseResult<
     PromiseSettledResult<Awaited<T[P]>>
@@ -237,10 +245,13 @@ export const allSettledCancelable = <T extends readonly unknown[] | []>(
 
   return new CancelablePromise(async (resolve, _, tools) => {
     // allow to cancel the group of promises when the allSettled promise is canceled
-    tools.onCancel(group.cancel);
+    const unsubscribeCancel = tools.onCancel(group.cancel);
 
     // wait for all the promises to be settled no matter if they are resolved or rejected
     const result = await Promise.all(promises);
+
+    // we cannot cancel the group of promises after they have been resolved
+    unsubscribeCancel();
 
     // return the tryCatchPromise results
     resolve(result as any);
