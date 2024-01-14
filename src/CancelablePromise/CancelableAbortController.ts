@@ -35,7 +35,7 @@ export class CancelableAbortController extends AbortController {
   private _subscriptions: Set<TRemoveEventListener> = new Set();
 
   public get subscriptions() {
-    return Array.from(this._subscriptions);
+    return Array.from(this._subscriptions ?? []);
   }
 
   public signal: CancelableAbortSignal;
@@ -44,6 +44,10 @@ export class CancelableAbortController extends AbortController {
     super();
 
     this.signal.subscribe = (...args: unknown[]) => {
+      if (!this._subscriptions) {
+        throw new Error('AbortController was already aborted or disposed.');
+      }
+
       const [arg1, arg2, arg3] = args;
 
       const type = typeof arg1 === 'string' ? arg1 : 'abort';
@@ -73,11 +77,15 @@ export class CancelableAbortController extends AbortController {
    */
   abort() {
     super.abort();
-    this._subscriptions = new Set();
+
+    this.dispose();
   }
 
+  /**
+   * Remove all listeners.
+   */
   dispose() {
-    this._subscriptions.forEach((subscription) => subscription());
+    this._subscriptions?.forEach((subscription) => subscription());
     this._subscriptions = null;
   }
 }

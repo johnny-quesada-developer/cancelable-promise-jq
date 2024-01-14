@@ -1,12 +1,150 @@
 # cancelable-promise-jq
 
-A utility for creating cancelable promise
+![Image John Avatar](https://raw.githubusercontent.com/johnny-quesada-developer/global-hooks-example/main/public/avatar2.jpeg)
 
-# Introduction
+Hello and welcome to **cancelable-promise-jq**, a streamlined and efficient solution for managing asynchronous operations in JavaScript with the elegance of cancelable promises! 🌟
 
-**cancelable-promise-jq** is a lightweight library that helps you manage and organize asynchronous callbacks in your JavaScript code. It provides a simple interface for registering and triggering callbacks, as well as managing their execution order.
+Asynchronous programming is a cornerstone of JavaScript development, and promises are its heartbeat. With **cancelable-promise-jq**, you elevate your coding experience by introducing the ability to cancel promises - a feature that adds a new layer of control and sophistication to your asynchronous logic.
 
-# API Documentation
+Whether you're developing with vanilla **JavaScript**, **TypeScript**, or integrating with various JavaScript frameworks, **cancelable-promise-jq** offers you the tools to efficiently manage promise states like 'pending', 'resolved', 'rejected', or the unique 'canceled'. This library is not just about cancellation; it's about enhancing the way you handle asynchronous patterns in your applications.
+
+Experience a new realm of possibility in promise handling with **cancelable-promise-jq**:
+
+# What Does a CancelablePromise Look Like?
+
+A cancelable promise looks just like a native promise, and, like the native promise, you can use it with async/await or with callbacks like then and catch.
+
+```ts
+const result = new CancelablePromise(
+  (resolve, reject, { onCancel, reportProgress, cancel }) => {
+    // ...your asynchronous code
+  },
+);
+```
+
+As you may notice, the first difference is that your promise constructor now receives an extra parameter with:
+
+### **cancel: (reason?: unknown) => CancelablePromise<TResult>**
+
+A method that allows you to cancel the promise from its inner scope
+
+### **onCancel: (callback: TCancelCallback) => Subscription**
+
+A method that allows you to subscribe to the cancel event of the promise, this is specially useful when you need to perform an specific action when the promise is canceled like aborting an http request, closing a socket, etc.
+
+### **reportProgress: (percentage: number, metadata?: unknown) => void**
+
+A method that allows you to report the progress of the promise, this is specially useful when you have an async operation that could take a long time and you want to report the progress to the user.
+
+Let's take a look at the code:
+
+```ts
+const result = new CancelablePromise(
+  async (resolve, reject, { onCancel, reportProgress, cancel }) => {
+    const abortController = new CancelableAbortController();
+
+    const request = fetch(
+      'https://jsonplaceholder.typicode.com/todos/',
+      abortController,
+    );
+
+    const unsubscribe = onCancel(() => {
+      abortController.abort();
+    });
+
+    const results = await request;
+
+    // the async process is not cancellable anymore
+    unsubscribe();
+
+    const todosById = await results.json().then((data) => {
+      const total = data.length;
+      const progressPerItem = 100 / total;
+
+      return data.reduce((accumulator, item) => {
+        accumulator[item.id] = item;
+
+        reportProgress(progressPerItem);
+
+        return accumulator;
+      }, {});
+    });
+
+    // if you need you can cancel the promises it self whenever you want
+    // cancel();
+
+    resolve(todosById);
+  },
+)
+  .then((result) => {
+    console.log(`%cReady!!!`, 'color: blue; font-weight: bold;', result);
+  })
+  .onProgress((progress) => {
+    console.log(`%ccomplete: ${progress}%`, 'color: blue; font-weight: bold;');
+  })
+  // .cancel() // you can also cancel the promise whenever you want from outside the promise
+  .catch((error) => {
+    // in case of error
+  });
+```
+
+Cool, right? The same promise is in charge of handling its own cancellation policy and resource cleanup. Now, this promise is also capable of sending feedback, like progress updates on a task, to the entire hierarchy!! and of course, you can have various subscriptions to the **onCancel** callback to implement different resource release strategies or controls as your task progresses in a linear manner
+
+```ts
+const result = new CancelablePromise(
+  async (resolve, reject, { onCancel, reportProgress, cancel }) => {
+    // set resources
+
+    let unsubscribe = onCancel(() => {
+      // if somethings need to be cleaned up or released at this point
+    });
+
+    // dom something and wait for it to finish
+
+    unsubscribe();
+
+    // do something else
+
+    // if something need to be cleaned up or released at this point
+    // add a new onCancel listener
+    unsubscribe = onCancel(() => {
+      // ...
+    });
+  },
+);
+```
+
+You can also add an onCancel listener from outside the promise body. The method for unsubscribing is similar to that used with the fetch **AbortController**
+
+```ts
+const abortController = new CancelableAbortController();
+
+const result = new CancelablePromise((resolve, reject) => {
+  // ... do something
+})
+  .onCancel((progress) => {}, abortController)
+  .onProgress((progress) => {}, abortController);
+
+// if your want to remove the callbacks listeners
+abortController.abort();
+
+// OR
+
+// also removing specific listeners is super easy
+const [_, unsubscribeProgress] = abortController.subscriptions;
+
+unsubscribeProgress();
+```
+
+The AbortController is meant to be used just once, so after calling the abort method, all listeners will be removed (This is the native behavior of the **AbortController**)
+
+# Don't wait any longer!
+
+Unlock the full potential of promises in JavaScript with cancelable-promise-jq and revolutionize the way you approach asynchronous programming!
+
+Don't just take our word for it; explore the capabilities yourself with detailed API documentation below. 🚀
+
+For more information, see the documentation and examples below. You can also check out other libraries that implement cancelable promises, such as [easy-web-worker](https://www.npmjs.com/package/easy-web-worker) and [easy-threads-workers](https://www.npmjs.com/package/easy-threads-workers).
 
 ## CancelablePromise
 
@@ -25,11 +163,7 @@ promise.catch((reason) => {
 });
 ```
 
-### Parameters
-
-#### **callback** (TCancelablePromiseCallback<TResult>): the callback of the promise, it will receive the resolve, reject and cancel functions.
-
-### Properties
+### Properties of a CancelablePromise
 
 #### `status`
 
@@ -42,25 +176,11 @@ The status of the promise.
 `onCancel:`
 Subscribe to the cancel event of the promise.
 
-`Parameters:`
-callback (TCancelCallback): the callback to be called when the promise is canceled.
-
-### Returns
-
-The promise itself.
-
-Type: CancelablePromise`<TResult>`
+`onProgress`
+Subscribe to the progress reports
 
 `cancel`
-Cancel the promise and all the chained promises.
-
-#### Parameters
-
-reason (unknown): the reason of the cancellation.
-Returns
-The promise itself.
-
-Type: CancelablePromise<TResult>
+Allows you to cancel the promise from outside the promise body
 
 ## createDecoupledPromise
 
