@@ -180,15 +180,12 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
         | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
         | undefined
         | null,
-    ): CancelablePromise<TResult1> => {
-      const { promise, resolve, reject } = this.createChildPromise<TResult1>();
+    ): CancelablePromise<TResult1 | TResult2> => {
+      const { promise, resolve, reject } = this.createChildPromise<
+        TResult1 | TResult2
+      >();
 
-      super
-        .then(onfulfilled, onrejected)
-        .then(
-          resolve as (value: TResult1 | TResult2) => void | PromiseLike<void>,
-          reject,
-        );
+      super.then(onfulfilled, onrejected).then(resolve, reject);
 
       return promise;
     };
@@ -197,17 +194,14 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
      * Override the catch method to return a CancelablePromise.
      * We need to override this here to avoid the bundler to polyfill the Promise.
      * */
-    this.catch = <T = never>(
+    this.catch = <T = unknown>(
       onrejected?: (reason: any) => T | PromiseLike<T>,
-    ): CancelablePromise<T> => {
-      const { promise, resolve, reject } = this.createChildPromise<T>();
+    ): CancelablePromise<T | TResult> => {
+      const { promise, resolve, reject } = this.createChildPromise<
+        T | TResult
+      >();
 
-      super
-        .catch(onrejected)
-        .then(
-          resolve as (value: TResult | T) => void | PromiseLike<void>,
-          reject,
-        );
+      super.catch(onrejected).then(resolve, reject);
 
       return promise;
     };
@@ -215,17 +209,10 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
     /**
      * Override the finally method to return a CancelablePromise.
      */
-    this.finally = <T = never>(
-      onfinally?: () => void,
-    ): CancelablePromise<T> => {
-      const { promise, resolve, reject } = this.createChildPromise<T>();
+    this.finally = (onfinally?: () => void): CancelablePromise<TResult> => {
+      const { promise, resolve, reject } = this.createChildPromise<TResult>();
 
-      super
-        .finally(onfinally)
-        .then(
-          resolve as (value: TResult | T) => void | PromiseLike<void>,
-          reject,
-        );
+      super.finally(onfinally).then(resolve, reject);
 
       return promise;
     };
@@ -375,7 +362,7 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
       | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
       | undefined
       | null,
-  ) => CancelablePromise<TResult1>;
+  ) => CancelablePromise<TResult1 | TResult2>;
 
   /**
    * Returns a Promise that resolves when the previous promise is rejected,
@@ -396,16 +383,16 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    *
    * childPromise.cancel();
    * */
-  public catch: <T = never>(
+  public catch: <T = unknown>(
     onrejected?: (reason: any) => T | PromiseLike<T>,
-  ) => CancelablePromise<T>;
+  ) => CancelablePromise<TResult | T>;
 
   /**
    * Subscribe a callback to be called when the promise is resolved or rejected,
    */
-  public finally: <T = never>(
+  public finally: (
     onfinally?: (() => void) | undefined | null,
-  ) => CancelablePromise<T>;
+  ) => CancelablePromise<TResult>;
 }
 
 /**

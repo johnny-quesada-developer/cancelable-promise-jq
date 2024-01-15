@@ -1,6 +1,6 @@
 {
   "name": "cancelable-promise-jq",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "CancelablePromise is a Promise that can be canceled. It is a Promise that has a status property that can be '`pending`', '`resolved`', '`rejected`' or '`canceled`'. It has an onCancel method that allows you to register a callback that will be called when the promise is canceled. It has a cancel method that allows you to cancel the promise.",
   "types": "lib/index.d.ts",
   "main": "lib/bundle.js",
