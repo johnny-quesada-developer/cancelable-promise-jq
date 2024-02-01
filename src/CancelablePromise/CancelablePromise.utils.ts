@@ -1,5 +1,4 @@
 import { tryCatchPromise, TTryCatchPromiseResult } from '../utils';
-import { CancelableAbortController } from './CancelableAbortController';
 
 import {
   CancelablePromise,

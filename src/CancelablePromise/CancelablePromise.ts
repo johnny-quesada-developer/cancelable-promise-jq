@@ -1,4 +1,15 @@
 import { CancelableAbortSignal } from './CancelableAbortController';
+import { toCancelablePromise } from './CancelablePromise.utils';
+
+export type PromiseCanceledResult = {
+  status: 'canceled';
+  reason?: unknown;
+};
+
+export type TPromiseSettledResult<T> =
+  | PromiseFulfilledResult<T>
+  | PromiseRejectedResult
+  | PromiseCanceledResult;
 
 export type TPromiseStatus = 'canceled' | 'pending' | 'resolved' | 'rejected';
 
@@ -239,7 +250,7 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    * */
   public cancel = (reason: unknown = null): CancelablePromise<TResult> => {
     // we cannot cancel promises that are completed
-    if (this.status !== 'pending') return;
+    if (this.status !== 'pending') return this;
 
     this.status = 'canceled';
 
@@ -393,6 +404,191 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
   public finally: (
     onfinally?: (() => void) | undefined | null,
   ) => CancelablePromise<TResult>;
+
+  /**
+   * Statics
+   */
+
+  public static resolve(): CancelablePromise<void>;
+
+  public static resolve<TResult>(
+    value: TResult,
+  ): CancelablePromise<Awaited<TResult>>;
+
+  public static resolve<TResult>(
+    value: TResult | PromiseLike<TResult>,
+  ): CancelablePromise<Awaited<TResult>>;
+
+  static resolve<TResult>(
+    value?: TResult,
+  ): CancelablePromise<Awaited<TResult>> {
+    return new CancelablePromise<Awaited<TResult>>((resolve) =>
+      resolve(value as Awaited<TResult>),
+    );
+  }
+
+  public static reject = (reason?: unknown): CancelablePromise<never> => {
+    return new CancelablePromise((_, reject) => reject(reason));
+  };
+
+  /**
+   * Returns a Promise object with status 'canceled'.
+   */
+  public static canceled = (reason?: unknown): CancelablePromise<never> => {
+    return new CancelablePromise((_, __, { cancel }) => cancel(reason));
+  };
+
+  /**
+   * Creates a Promise that is resolved or rejected when any of the provided Promises are resolved or rejected.
+   * If the race is canceled, all the promises are canceled.
+   */
+  public static race = <TResult>(
+    values: Array<TResult | PromiseLike<TResult> | CancelablePromise<TResult>>,
+  ): CancelablePromise<Awaited<TResult>> => {
+    return new CancelablePromise<Awaited<TResult>>(
+      (resolve, reject, { onCancel, cancel: parentCancel }) => {
+        values.forEach((promise) => {
+          const cancelable = toCancelablePromise<unknown, Awaited<TResult>>(
+            promise,
+          );
+
+          onCancel(() => {
+            cancelable.cancel();
+          });
+
+          cancelable.then(resolve, (reason) => {
+            if (cancelable.status === 'canceled') {
+              // cancel parent promise
+              parentCancel(reason);
+
+              return;
+            }
+
+            reject(reason);
+          });
+        });
+      },
+    );
+  };
+
+  /**
+   * Creates a Promise that is resolved with an array of results when all of the provided Promises resolve, or rejected when any Promise is rejected.
+   * If the all is canceled, all the promises are canceled.
+   */
+  public static all = <TSource extends readonly unknown[] | []>(
+    values: TSource,
+  ): CancelablePromise<{
+    -readonly [P in keyof TSource]: Awaited<TSource[P]>;
+  }> => {
+    type Result = {
+      -readonly [P in keyof TSource]: Awaited<TSource[P]>;
+    };
+
+    return new CancelablePromise<Result>(
+      (resolve, reject, { onCancel, cancel: parentCancel }) => {
+        const results: Map<CancelablePromise<unknown>, unknown> = new Map();
+        const promisesLength = values.length;
+        let resultsLength = 0;
+
+        values.forEach((promise) => {
+          const cancelable = toCancelablePromise<unknown, unknown>(promise);
+
+          results.set(cancelable, null);
+
+          onCancel(() => {
+            cancelable.cancel();
+          });
+
+          cancelable.then(
+            (result) => {
+              resultsLength++;
+              results.set(cancelable, result);
+
+              const isAllResolved = resultsLength === promisesLength;
+
+              if (!isAllResolved) return;
+
+              resolve(Array.from(results.values()) as Result);
+            },
+            (reason) => {
+              if (cancelable.status === 'canceled') {
+                // cancel parent promise
+                parentCancel(reason);
+
+                return;
+              }
+
+              reject(reason);
+            },
+          );
+        });
+      },
+    );
+  };
+
+  /**
+   * Creates a Promise that is resolved with an array of results when all
+   * of the provided Promises resolve or reject.
+   * If the allSettled is canceled, all the promises are canceled.
+   * @param values An array of Promises.
+   * @returns A new Promise.
+   */
+  static allSettled = <TResult extends readonly unknown[] | []>(
+    values: TResult,
+  ): CancelablePromise<{
+    -readonly [P in keyof TResult]: PromiseSettledResult<Awaited<TResult[P]>>;
+  }> => {
+    type Result = {
+      -readonly [P in keyof TResult]: PromiseSettledResult<Awaited<TResult[P]>>;
+    };
+
+    return new CancelablePromise<Result>((resolve, _, { onCancel }) => {
+      const results: Map<
+        CancelablePromise<unknown>,
+        PromiseSettledResult<unknown>
+      > = new Map();
+
+      const promisesLength = values.length;
+      let resultsLength = 0;
+
+      values.forEach((value) => {
+        const cancelable = toCancelablePromise<unknown, unknown>(value);
+
+        results.set(cancelable, null);
+
+        onCancel(() => {
+          cancelable.cancel();
+        });
+
+        cancelable
+          .then(
+            (result) => {
+              results.set(cancelable, {
+                status: 'fulfilled',
+                value: result,
+              });
+            },
+            (reason) => {
+              results.set(cancelable, {
+                status: (cancelable.status === 'canceled'
+                  ? 'canceled'
+                  : ('rejected' as unknown)) as 'rejected',
+                reason,
+              });
+            },
+          )
+          .finally(() => {
+            resultsLength++;
+
+            const isAllResolved = resultsLength === promisesLength;
+
+            if (!isAllResolved) return;
+
+            resolve(Array.from(results.values()) as Result);
+          });
+      });
+    });
+  };
 }
 
 /**

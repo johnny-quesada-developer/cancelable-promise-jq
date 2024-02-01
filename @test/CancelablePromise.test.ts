@@ -73,14 +73,20 @@ describe('CancelablePromise', () => {
     });
   });
 
-  it('shoul not execute promise.then if the promise is canceled', async () => {
+  it('should not execute promise.then if the promise is canceled', async () => {
     expect.assertions(1);
 
-    const promise = new CancelablePromise<string>((resolve) => {
-      setTimeout(() => {
-        resolve('result');
-      }, 1000);
-    });
+    const promise = new CancelablePromise<string>(
+      (resolve, _, { onCancel }) => {
+        const timeoutId = setTimeout(() => {
+          resolve('result');
+        }, 1000);
+
+        onCancel(() => {
+          clearTimeout(timeoutId);
+        });
+      },
+    );
 
     promise.cancel();
 
@@ -143,10 +149,14 @@ describe('CancelablePromise', () => {
   });
 
   it('should cancel all the chained promises if cancel is called', () => {
-    const promise = new CancelablePromise((resolve) => {
-      setTimeout(() => {
+    const promise = new CancelablePromise((resolve, _, { onCancel }) => {
+      const timeoutId = setTimeout(() => {
         resolve();
       }, 1000);
+
+      onCancel(() => {
+        clearTimeout(timeoutId);
+      });
     });
 
     const childPromise = promise.then(() => {
