@@ -1,5 +1,8 @@
-import { CancelablePromise } from '../src/CancelablePromise';
-import { tryCatch, tryCatchPromise } from '../src/utils';
+import {
+  CancelablePromise,
+  tryCatch,
+  tryCatchPromise,
+} from 'easy-cancelable-promise';
 
 describe('tryCatch', () => {
   beforeEach(() => {
@@ -52,7 +55,7 @@ describe('tryCatchPromise', () => {
 
     expect(result).toBe('result');
     expect(error).toBeNull();
-    expect(promise).toBeInstanceOf(CancelablePromise);
+    expect(Promise.resolve(promise)).toBe(promise);
     expect(promise?.status).toBe('resolved');
     expect(console.error).not.toBeCalled();
   });
@@ -64,7 +67,7 @@ describe('tryCatchPromise', () => {
 
     expect(result).toBeNull();
     expect(error).toBeInstanceOf(Error);
-    expect(promise).toBeInstanceOf(CancelablePromise);
+    expect(Promise.resolve(promise)).toBe(promise);
     expect(promise?.status).toBe('rejected');
     expect(console.error).toBeCalled();
   });
@@ -79,7 +82,7 @@ describe('tryCatchPromise', () => {
 
     expect(result).toBe('default');
     expect(error).toBeInstanceOf(Error);
-    expect(promise).toBeInstanceOf(CancelablePromise);
+    expect(Promise.resolve(promise)).toBe(promise);
     expect(promise?.status).toBe('rejected');
     expect(console.error).toBeCalled();
   });
@@ -92,7 +95,7 @@ describe('tryCatchPromise', () => {
 
     expect(result).toBe('result');
     expect(error).toBeNull();
-    expect(promise).toBeInstanceOf(CancelablePromise);
+    expect(Promise.resolve(promise)).toBe(promise);
     expect(promise?.status).toBe('resolved');
     expect(console.error).not.toBeCalled();
   });
@@ -118,7 +121,7 @@ describe('tryCatchPromise', () => {
 
     expect(result).toBeNull();
     expect(error).toBeNull();
-    expect(promise).toBeInstanceOf(CancelablePromise);
+    expect(Promise.resolve(promise)).toBe(promise);
     expect(promise?.status).toBe('canceled');
     expect(console.error).not.toBeCalled();
 
@@ -149,7 +152,7 @@ describe('tryCatchPromise', () => {
 
     expect(result).toBe('default');
     expect(error).toBeNull();
-    expect(promise).toBeInstanceOf(CancelablePromise);
+    expect(Promise.resolve(promise)).toBe(promise);
     expect(promise?.status).toBe('canceled');
     expect(console.error).not.toBeCalled();
   }, 10000);

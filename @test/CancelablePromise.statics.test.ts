@@ -1,4 +1,4 @@
-import { CancelablePromise } from '../src/CancelablePromise';
+import { CancelablePromise, isCancelablePromise } from 'easy-cancelable-promise';
 
 describe('CancelablePromise Static Methods', () => {
   describe('CancelablePromise.all', () => {
@@ -54,7 +54,7 @@ describe('CancelablePromise Static Methods', () => {
     });
 
     it('should cancel the parent promise if one of the child promises is canceled', () => {
-      expect.assertions(3);
+      expect.assertions(4);
 
       const cancelLoggers = jest.fn();
 
@@ -75,7 +75,8 @@ describe('CancelablePromise Static Methods', () => {
         expect(error).toBeInstanceOf(Error);
         expect(promise.status).toBe('canceled');
         expect(cancelLoggers).toBeCalled();
-      });
+        expect(isCancelablePromise(promise)).toBe(true);
+      });            
     });
 
     it('should cancel all the promises', () => {
@@ -190,11 +191,10 @@ describe('CancelablePromise Static Methods', () => {
         }),
       ]);
 
-      const results = await promise as PromiseRejectedResult[];
+      const results = (await promise) as PromiseRejectedResult[];
 
-    
-      expect(results.map(x => x.status)).toEqual(['canceled', 'canceled']);
-      expect(results.map(x => x.reason)).toEqual(['canceled1', 'canceled2']);
+      expect(results.map((x) => x.status)).toEqual(['canceled', 'canceled']);
+      expect(results.map((x) => x.reason)).toEqual(['canceled1', 'canceled2']);
       expect(promise.status).toBe('resolved');
     });
 

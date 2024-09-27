@@ -1,2 +1,1 @@
-export * from './CancelablePromise';
-export * from './utils';
+export * from 'easy-cancelable-promise';

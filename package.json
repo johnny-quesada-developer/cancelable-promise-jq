@@ -1,7 +1,7 @@
 {
   "name": "cancelable-promise-jq",
-  "version": "2.6.0",
-  "description": "CancelablePromise is a Promise that can be canceled. It is a Promise that has a status property that can be '`pending`', '`resolved`', '`rejected`' or '`canceled`'. It has an onCancel method that allows you to register a callback that will be called when the promise is canceled. It has a cancel method that allows you to cancel the promise.",
+  "version": "2.6.1",
+  "description": "This library was renamed to `easy-cancelable-promise` as of Sep-27-2024. Please update any references of the old library name in your project",
   "types": "lib/index.d.ts",
   "main": "lib/bundle.js",
   "files": [
@@ -20,6 +20,9 @@
     "postversion": "git push && git push --tags",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx --max-warnings=0",
     "lint:fix": "eslint --fix src  --ext .js,.jsx,.ts,.tsx --max-warnings=0"
+  },
+  "dependencies": {
+    "easy-cancelable-promise": "^1.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.21.3",
