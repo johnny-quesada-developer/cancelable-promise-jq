@@ -248,19 +248,21 @@ export class CancelablePromise<TResult = void> extends Promise<TResult> {
    * @param {unknown} [reason] the reason of the cancellation
    * @returns {CancelablePromise} the promise itself
    * */
-  public cancel = (reason: unknown = null): CancelablePromise<TResult> => {
+  public cancel = (reason?: unknown): CancelablePromise<TResult> => {
     // we cannot cancel promises that are completed
     if (this.status !== 'pending') return this;
 
     this.status = 'canceled';
 
+    const _reason = reason === undefined ? new Error('Promise canceled') : reason;
+
     // the own promise cancel callbacks are called first
-    this.ownCancelCallbacks.forEach((callback) => callback(reason));
+    this.ownCancelCallbacks.forEach((callback) => callback(_reason));
 
     // then the promise cancel second level subscribers
-    this.cancelCallbacks.forEach((callback) => callback(reason));
+    this.cancelCallbacks.forEach((callback) => callback(_reason));
 
-    this._reject(reason);
+    this._reject(_reason);
     this.disposeCallbacks();
 
     return this;

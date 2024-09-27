@@ -72,7 +72,7 @@ describe('CancelablePromise Static Methods', () => {
       });
 
       return promise.catch((error) => {
-        expect(error).toBe(null);
+        expect(error).toBeInstanceOf(Error);
         expect(promise.status).toBe('canceled');
         expect(cancelLoggers).toBeCalled();
       });
@@ -97,7 +97,7 @@ describe('CancelablePromise Static Methods', () => {
       ]);
 
       return promise.cancel().catch((error) => {
-        expect(error).toBe(null);
+        expect(error).toBeInstanceOf(Error);
         expect(promise.status).toBe('canceled');
         expect(cancelLoggers).toBeCalledTimes(2);
       });
@@ -179,30 +179,22 @@ describe('CancelablePromise Static Methods', () => {
     });
 
     it('should handled canceled promises', async () => {
-      expect.assertions(2);
+      expect.assertions(3);
 
       const promise = CancelablePromise.allSettled([
         new CancelablePromise<string>((_, __, utils) => {
-          utils.cancel();
+          utils.cancel('canceled1');
         }),
         new CancelablePromise<number>((_, __, utils) => {
-          utils.cancel();
+          utils.cancel('canceled2');
         }),
       ]);
 
-      const results = await promise;
+      const results = await promise as PromiseRejectedResult[];
 
-      expect(results).toEqual([
-        {
-          reason: null,
-          status: 'canceled',
-        },
-        {
-          reason: null,
-          status: 'canceled',
-        },
-      ]);
-
+    
+      expect(results.map(x => x.status)).toEqual(['canceled', 'canceled']);
+      expect(results.map(x => x.reason)).toEqual(['canceled1', 'canceled2']);
       expect(promise.status).toBe('resolved');
     });
 
@@ -387,9 +379,9 @@ describe('CancelablePromise Static Methods', () => {
     it('should return a canceled promise', async () => {
       expect.assertions(2);
 
-      const promise = CancelablePromise.canceled();
+      const promise = CancelablePromise.canceled('canceled');
 
-      await expect(promise).rejects.toBe(null);
+      await expect(promise).rejects.toEqual('canceled');
       expect(promise.status).toBe('canceled');
     });
 

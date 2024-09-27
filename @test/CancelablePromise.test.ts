@@ -43,7 +43,7 @@ describe('CancelablePromise', () => {
     });
 
     return promise.catch((error) => {
-      expect(error).toBe(null);
+      expect(error).toBeInstanceOf(Error);
       expect(promise.status).toBe('canceled');
     });
   });
